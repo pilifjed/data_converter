@@ -12,7 +12,9 @@ class FileParseException(Exception):
 
 def parse_calibration_file(file_name):
     """Reads text digi file and stores it in a map structure"""
-    CHANELS_NO = 32
+    CHANELS_NO = 16
+    SAMPIC_NO = 2
+    VALUES_NO = CHANELS_NO*SAMPIC_NO
     CELLS_NO = 64
     
     def parse_line(line):
@@ -23,24 +25,27 @@ def parse_calibration_file(file_name):
     with open(file_name,"r",errors="replace") as text_file:
         first = True
         line_counter = 1
-        channel = []
-        output = {"voltage_probes_no": 0, "voltage":[], "chanels":[]}
+        temp_cells = []
+        output = {"values":[]}
+        temp_val = {"db": -1, "sampic": -1, "chanel": -1, "cells": []}
         for line in text_file:
             if(line[0].isdigit()):
                 if(first):
                     first = False
                     output["voltage"] = parse_line(line)
                 else:
-                    channel.append(parse_line(line))
+                    temp_cells.append(parse_line(line))
                     if(end_of_channel(line_counter)):
-                        output["chanels"].append(channel)
-                        channel = []
+                        temp_val["sampic"] = 1 - ((line_counter - 1) // CELLS_NO) // CHANELS_NO
+                        temp_val["chanel"] = ((line_counter - 1) // CELLS_NO) % 16
+                        temp_val["cells"] = temp_cells
+                        output["values"].append(temp_val.copy())
+                        temp_cells = []
                     line_counter+=1
-        output["voltage_probes_no"] = len(output["voltage"])
         
-        if(CHANELS_NO != len(output["chanels"])):
-            raise FileParseException('Corrupt file or wrong CHANELS_NO, CELLS_NO values specified. Expected CHANELS_NO = ' 
-                                     + str(CHANELS_NO) +', got '+ str(len(output["chanels"])))
+        if(VALUES_NO != len(output["values"])):
+            raise FileParseException('Corrupt file or wrong CHANELS_NO, SAMPIC_NO or CELLS_NO values specified. Expected CHANELS_NO*SAMPIC_NO = ' 
+                                     + str(VALUES_NO) +', got '+ str(len(output["values"])))
     return output
       
 def process_cell(voltage, cell, fit):
@@ -76,18 +81,18 @@ def convert_calibration_file(file_name, function, output_file_name=None, fit_fro
     output_file_name, fit_from, fit_to = handle_optional_parameters(data, file_name, output_file_name, fit_from, fit_to)
   
     fit = ROOT.TF1("fit",function, fit_from, fit_to)
-    all_chanels = data["chanels"]
-    conv_all_chanels = []
-    for chanel in all_chanels:
-        conv_chanel = []
-        for cell in chanel:
-            conv_chanel.append(process_cell(data["voltage"], cell, fit))
-        conv_all_chanels.append(conv_chanel)
-    new_data = {"function":function, "chanels":conv_all_chanels}
+    all_values = data["values"]
+    for value in all_values:
+        conv_value = []
+        for cell in value["cells"]:
+            conv_value.append(process_cell(data["voltage"], cell, fit))
+        value["cells"] = conv_value
+    
+    del data["voltage"]
+    data["function"] = function
     
     with open(output_file_name, 'w') as outfile:
-        json.dump(new_data, outfile)
-    return new_data
+        json.dump(data, outfile)
             
 def main():
     parser = argparse.ArgumentParser(description='Converts text calibration data to .cal.JSON format,by fitting function to the given data and storing its parameters.')
@@ -101,4 +106,3 @@ def main():
     
 if __name__ == '__main__':
     main()
-
