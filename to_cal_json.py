@@ -25,9 +25,9 @@ def float_convertable(value):
 
 def parse_calibration_file(file_name):
     """Reads text digi file and stores it in a map structure"""
-    CHANELS_NO = 16
+    CHANNELS_NO = 16
     SAMPIC_NO = 2
-    VALUES_NO = CHANELS_NO*SAMPIC_NO
+    VALUES_NO = CHANNELS_NO*SAMPIC_NO
     CELLS_NO = 64
 
     def parse_line(line):
@@ -43,7 +43,7 @@ def parse_calibration_file(file_name):
         temp_val = {}
 
         try:
-            db = re.search('_db(\d+)',file_name)
+            db = re.search('_db(\d+)',file_name, re.IGNORECASE)
             temp_val["db"] = int(db.group(1))
         except AttributeError:
             raise FileParseException("DB not specified in file name")
@@ -58,15 +58,15 @@ def parse_calibration_file(file_name):
                     temp_cells.append(parse_line(line))
                     if(end_of_channel(line_counter)):
                         temp_val["time_offset"] = 0
-                        temp_val["sampic"] = 1 - ((line_counter - 1) // CELLS_NO) // CHANELS_NO
-                        temp_val["chanel"] = ((line_counter - 1) // CELLS_NO) % 16
+                        temp_val["sampic"] = 1 - ((line_counter - 1) // CELLS_NO) // CHANNELS_NO
+                        temp_val["channel"] = ((line_counter - 1) // CELLS_NO) % 16
                         temp_val["cells"] = temp_cells
                         output["values"][temp_val["db"]].append(temp_val.copy())
                         temp_cells = []
                     line_counter+=1
 
         if(VALUES_NO != len(output["values"][next(iter(output["values"]))])):
-            raise FileParseException('Corrupt file or wrong CHANELS_NO, SAMPIC_NO or CELLS_NO values specified. Expected CHANELS_NO*SAMPIC_NO = '
+            raise FileParseException('Corrupt file or wrong CHANNELS_NO, SAMPIC_NO or CELLS_NO values specified. Expected CHANNELS_NO*SAMPIC_NO = '
                                      + str(VALUES_NO) +', got '+ str(len(output["values"][next(iter(output["values"]))])))
     return output
 
@@ -92,10 +92,10 @@ def handle_optional_parameters(parsed_data, fit_from, fit_to):
 
 
 
-def draw_plots(x, all_y, fit, chanel_to_plot):
+def draw_plots(x, all_y, fit, channel_to_plot):
     """Draws plots"""
     plt.figure(1)
-    plt.title("Chanel "+ chanel_to_plot + " cells")
+    plt.title("Channel "+ channel_to_plot + " cells")
     plt.xlabel("Voltage")
     plt.ylabel("Digital value")
     for y in all_y:
@@ -118,16 +118,16 @@ def draw_plots(x, all_y, fit, chanel_to_plot):
     plt.show()
 
 
-def convert_calibration_file(data, function, fit_from=None, fit_to=None, chanel_to_plot=None):
+def convert_calibration_file(data, function, fit_from=None, fit_to=None, channel_to_plot=None):
     """Main calibration function"""
 
     fit = ROOT.TF1("fit",function, fit_from, fit_to)
 
     db_no = next(iter(data["values"]))
 
-    if(chanel_to_plot is not None):
-        chanel_no = chanel_to_plot
-        draw_plots(data["voltage"], data["values"][db_no][int(chanel_no)]["cells"], fit, chanel_no)
+    if(channel_to_plot is not None):
+        channel_no = channel_to_plot
+        draw_plots(data["voltage"], data["values"][db_no][int(channel_no)]["cells"], fit, channel_no)
 
     all_values = data["values"][db_no]
     for value in all_values:
@@ -166,7 +166,7 @@ def main():
     parser.add_argument("-f", "--function", default="pol1",action="store",help="set function to fit i.e. \'[0]*x+[1]\'")
     parser.add_argument("-l", "--fit_from", action="store", metavar="LEFT_FIT_BOUND", help="set left bound of fit values interval")
     parser.add_argument("-r", "--fit_to", action="store", metavar="RIGHT_FIT_BOUND", help="set right bound of fit values interval")
-    parser.add_argument("-p", "--plot",action="store", metavar="CHANEL_TO_PLOT_NO", help="enable plotting during conversion")
+    parser.add_argument("-p", "--plot",action="store", metavar="CHANNEL_TO_PLOT_NO", help="enable plotting during conversion")
     parser.add_argument("-m", "--merge", action="store", metavar="OUTPUT_FILE_NAME", help="enable merge mode")
     args = parser.parse_args()
 
