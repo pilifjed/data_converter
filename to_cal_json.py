@@ -8,7 +8,6 @@ import numpy as np
 import ROOT
 from array import array
 
-
 class FileParseException(Exception):
     pass
 
@@ -70,10 +69,10 @@ def parse_calibration_file(file_name):
                                      + str(VALUES_NO) +', got '+ str(len(output["values"][next(iter(output["values"]))])))
     return output
 
-def process_cell(voltage, cell, fit):
+def process_cell(cell, voltage, fit):
     """Fits given TF1 to the cell, and stores its parameters"""
-    x = array('d',sorted(voltage))
-    y = array('d',sorted(cell))
+    x = array('d',sorted(cell))
+    y = array('d',sorted(voltage))
     graph = ROOT.TGraph(len(x),x,y)
     parameters = graph.Fit(fit, 'SQR')
     output = []
@@ -81,44 +80,43 @@ def process_cell(voltage, cell, fit):
         output.append(parameters.Value(i))
     return output
 
-def handle_optional_parameters(parsed_data, fit_from, fit_to):
+def handle_optional_parameters(fit_from, fit_to):
     """Sets default values of optional parameters if unset"""
     if((fit_from is None)): # """or (float(fit_from) < 0)"""
         fit_from=0
     if((fit_to is None)): # """or (float(fit_to) > max_fit_to)"""
-        max_fit_to = min(max((float(x) for x in data["voltage"])) for file_name, data in parsed_data)
-        fit_to=max_fit_to
-    return  float(fit_from), float(fit_to)
+        fit_to=255
+    return  int(fit_from), int(fit_to)
 
 
 
-def draw_plots(x, all_y, fit, channel_to_plot):
+def draw_plots(y, all_x, fit, channel_to_plot):
     """Draws plots"""
     plt.figure(1)
     plt.title("Channel "+ channel_to_plot + " cells")
-    plt.xlabel("Voltage")
-    plt.ylabel("Digital value")
-    for y in all_y:
+    plt.xlabel("Digital value")
+    plt.ylabel("Voltage")
+    for x in all_x:
         plt.plot(x,y)
-    process_cell(x, all_y[0], fit)
-    fit_val = [fit.Eval(i) for i in x]
-    residual_val = [abs(i-j) for i,j in zip(fit_val,all_y[0])]
+    process_cell(all_x[0], y, fit)
+    fit_val = [fit.Eval(i) for i in all_x[0]]
+    residual_val = [abs(i-j) for i,j in zip(fit_val,y)]
     fig = plt.figure(2)
     plt.title("Values and Fit")
-    plt.xlabel("Voltage")
-    plt.ylabel("Digital value")
-    plt.plot(x,all_y[0])
-    plt.plot(x,fit_val)
+    plt.xlabel("Digital value")
+    plt.ylabel("Voltage")
+    plt.plot(all_x[0],y)
+    plt.plot(all_x[0],fit_val)
     plt.legend(["Digital values","Fitted function"],bbox_to_anchor=(1, 1), loc=4, borderaxespad=0.)
     plt.figure(3)
     plt.title("Fit residual")
-    plt.xlabel("Voltage")
+    plt.xlabel("Digital value")
     plt.ylabel("Residual")
-    plt.scatter(x,residual_val)
+    plt.scatter(all_x[0],residual_val)
     plt.show()
 
 
-def convert_calibration_file(data, function, fit_from=None, fit_to=None, channel_to_plot=None):
+def convert_calibration_file(data, function, fit_from, fit_to, channel_to_plot=None):
     """Main calibration function"""
 
     fit = ROOT.TF1("fit",function, fit_from, fit_to)
@@ -192,7 +190,7 @@ def main():
                 print("File " + file_name + " skipped. An error ocurred during parse process: " + str(e))
 
     if parsed_data != []:
-        fit_from, fit_to = handle_optional_parameters(parsed_data, args.fit_from, args.fit_to)
+        fit_from, fit_to = handle_optional_parameters(args.fit_from, args.fit_to)
 
     for file_name, data in parsed_data:
         try:
