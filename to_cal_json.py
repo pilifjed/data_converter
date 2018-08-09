@@ -14,6 +14,11 @@ class FileParseException(Exception):
 class FileMergeException(Exception):
     pass
 
+def quit_figure(event):
+    if event.key == 'q':
+        plt.close('all')
+
+
 def float_convertable(value):
     """Checks if value is converable to float"""
     try:
@@ -57,6 +62,7 @@ def parse_calibration_file(file_name):
                     temp_cells.append(parse_line(line))
                     if(end_of_channel(line_counter)):
                         temp_val["time_offset"] = 0
+                        temp_val["time_precision"] = 0.1
                         temp_val["sampic"] = 1 - ((line_counter - 1) // CELLS_NO) // CHANNELS_NO
                         temp_val["channel"] = ((line_counter - 1) // CELLS_NO) % 16
                         temp_val["cells"] = temp_cells
@@ -113,7 +119,6 @@ def draw_plots(y, all_x, fit, channel_to_plot):
     plt.xlabel("Digital value")
     plt.ylabel("Residual")
     plt.scatter(all_x[0],residual_val)
-    plt.show()
 
 
 def convert_calibration_file(data, function, fit_from, fit_to, channel_to_plot=None):
@@ -131,8 +136,10 @@ def convert_calibration_file(data, function, fit_from, fit_to, channel_to_plot=N
     for value in all_values:
         conv_value = []
         for cell in value["cells"]:
-            conv_value.append(process_cell(data["voltage"], cell, fit))
+            conv_value.append(process_cell(cell,data["voltage"], fit))
         value["cells"] = conv_value
+
+
     del data["voltage"]
     data["parameters"] = data.pop("values")
     data["formula"] = function
@@ -214,6 +221,11 @@ def main():
     for output_file_name, data in output_data:
         with open(output_file_name, 'w') as outfile:
             json.dump(data, outfile)
+
+    cid = plt.gcf().canvas.mpl_connect('key_press_event', quit_figure)
+    print("PRESS Q TO CLOSE GRAPHS")
+    if(args.plot is not None):
+        plt.show()
 
 if __name__ == '__main__':
     main()
